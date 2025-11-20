@@ -2,83 +2,121 @@ pipeline {
     agent any
 
     environment {
-        DAG_REMOTE = "dags"
+        ENV_FILE = ".env"
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Setup Python Environment') {
             steps {
-                checkout scm
-            }
-        }
+                bat '''
+                echo ==== Setting up Python Environment ====
+                python -m venv venv
+                call venv\\Scripts\\activate
 
-        stage('Setup Python & DVC') {
-            steps {
-                powershell '''
-                    python --version
+                pip install --upgrade pip
+                pip install dvc dagshub dvc[http] python-dotenv datasets
 
-                    # Create venv if not present
-                    if (!(Test-Path "venv")) {
-                        python -m venv venv
-                    }
-
-                    .\\venv\\Scripts\\python.exe -m pip install --upgrade pip
-                    .\\venv\\Scripts\\python.exe -m pip install dvc
+                echo Environment ready.
                 '''
             }
         }
 
-        stage('Configure DVC Remote Auth') {
+        stage('Load .env Variables') {
             steps {
-                withCredentials([string(credentialsId: 'dagshub-token', variable: 'DAG_TOKEN')]) {
-                    powershell '''
-                        Write-Host "Using remote: dags"
-
-                        .\\venv\\Scripts\\dvc remote modify dags --local auth basic
-                        .\\venv\\Scripts\\dvc remote modify dags --local user pnarkz
-                        .\\venv\\Scripts\\dvc remote modify dags --local password $env:DAG_TOKEN
-                    '''
-                }
-            }
-        }
-
-        stage('DVC Add & Git Commit') {
-            steps {
-                powershell '''
-                    git checkout main
-
-                    if (Test-Path "data") {
-                        .\\venv\\Scripts\\dvc add data
-                    }
-
-                    git config user.name "pnarkz"
-                    git config user.email "pinarkocagoz0336@gmail.com"
-
-                    git add -A
-                    git commit -m "ci: auto dvc track"
-                    if ($LASTEXITCODE -ne 0) { Write-Host "No changes to commit" }
-
-                    git push origin main
+                bat '''
+                echo ==== Loading .env Environment Variables ====                
+                for /f "tokens=1,2 delims==" %%a in (%ENV_FILE%) do (
+                    set %%a=%%b
+                )
+                echo HUGGINGFACE_ACCESS_TOKEN loaded.
                 '''
             }
         }
 
-        stage('DVC Push Data') {
+        stage('Download Dataset from HuggingFace') {
             steps {
-                powershell '''
-                    .\\venv\\Scripts\\dvc push -r dags
+                bat '''
+                echo ==== Downloading Dataset hsena/llmtwin ====
+                call venv\\Scripts\\activate
+
+                python - << EOF
+import os
+from datasets import load_dataset
+from dotenv import load_dotenv
+import shutil
+
+# Load .env file
+load_dotenv(".env")
+
+hf_token = os.getenv("HUGGINGFACE_ACCESS_TOKEN")
+if not hf_token:
+    raise ValueError("HUGGINGFACE_ACCESS_TOKEN not found in environment!")
+
+print("Token loaded successfully:", hf_token[:10] + "...")
+
+# HuggingFace configuration
+os.environ["HF_TOKEN"] = hf_token
+os.environ["HUGGINGFACE_HUB_TOKEN"] = hf_token
+os.environ["HUGGINGFACE_ACCESS_TOKEN"] = hf_token
+
+# Download dataset
+ds = load_dataset("hsena/llmtwin", token=hf_token)
+
+# Reset data/ dir
+if os.path.exists("data"):
+    shutil.rmtree("data")
+os.makedirs("data", exist_ok=True)
+
+# Save dataset entries
+for i, row in enumerate(ds["train"]):
+    with open(f"data/item_{i}.json", "w", encoding="utf-8") as f:
+        f.write(str(row))
+
+print("Dataset downloaded to data/")
+EOF
+                '''
+            }
+        }
+
+        stage('DVC Track Data') {
+            steps {
+                bat '''
+                echo ==== Tracking Data with DVC ====
+                call venv\\Scripts\\activate
+
+                dvc add data
+                git add data.dvc .gitignore
+                git commit -m "Track dataset hsena/llmtwin via Jenkins"
+                '''
+            }
+        }
+
+        stage('Push DVC Data to DagsHub') {
+            steps {
+                bat '''
+                echo ==== Pushing Data to DagsHub ====
+                call venv\\Scripts\\activate
+                dvc push -r dags -v
+                '''
+            }
+        }
+
+        stage('Push Code to GitHub') {
+            steps {
+                bat '''
+                echo ==== Pushing Code to GitHub ====
+                git add .
+                git commit -m "Jenkins auto-commit"
+                git push origin main
                 '''
             }
         }
     }
 
     post {
-        success {
-            echo '✔ Pipeline SUCCESS'
-        }
-        failure {
-            echo '❌ Pipeline FAILED — check logs'
+        always {
+            echo "Pipeline finished."
         }
     }
 }
