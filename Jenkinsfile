@@ -34,7 +34,6 @@ pipeline {
         stage('Setup Python & DVC') {
             steps {
                 bat '''
-                echo ==== Setting up Python Environment ====
                 python -m venv venv
                 call venv\\Scripts\\activate
                 pip install --upgrade pip
@@ -56,7 +55,7 @@ pipeline {
             }
         }
 
-        // 🔥🔥🔥 BURASI ESKİ ÇALIŞAN VERSİYON
+        // 🔥 %100 ÇALIŞAN ESKİ METOT — python <<EOF
         stage('Download Dataset from HuggingFace') {
             steps {
                 bat '''
@@ -68,24 +67,22 @@ from dotenv import load_dotenv
 
 load_dotenv(".env")
 token = os.getenv("HUGGINGFACE_ACCESS_TOKEN")
-
 print("Token loaded:", token[:10] + "...")
 
-# temizle
+# temiz klasör
 if os.path.exists("data"):
     shutil.rmtree("data")
-
 os.makedirs("data", exist_ok=True)
 
-# dataset
+# dataset indir
 ds = load_dataset("hsena/llmtwin", token=token)
 
-# kayıt
+# json kaydet
 for i, row in enumerate(ds["train"]):
-    with open(f"data/item_{i}.json", "w", encoding="utf-8") as f:
+    with open(f"data/item_{i}.json","w",encoding="utf-8") as f:
         json.dump(row, f, ensure_ascii=False)
 
-print("Dataset downloaded.")
+print("Dataset downloaded successfully.")
 EOF
                 '''
             }
@@ -116,13 +113,9 @@ EOF
         stage('Push Code to GitHub') {
             steps {
                 bat '''
-                echo ==== Making sure we are on main before pushing ====
                 git checkout main
-
                 git add .
                 git commit -m "ci: auto update" || echo "No changes"
-
-                echo ==== Pushing to GitHub main branch ====
                 git push origin main
                 '''
             }
@@ -130,11 +123,7 @@ EOF
     }
 
     post {
-        success {
-            echo '✔ Pipeline SUCCESS'
-        }
-        failure {
-            echo '❌ Pipeline FAILED — check logs'
-        }
+        success { echo '✔ Pipeline SUCCESS' }
+        failure { echo '❌ Pipeline FAILED — check logs' }
     }
 }
