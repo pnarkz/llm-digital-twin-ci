@@ -7,13 +7,24 @@ pipeline {
 
     stages {
 
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Setup Python & DVC') {
             steps {
                 powershell '''
                     python --version
-                    python -m venv venv
-                    .\\venv\\Scripts\\pip install --upgrade pip
-                    .\\venv\\Scripts\\pip install dvc[dagshub]
+
+                    # Create venv if not present
+                    if (!(Test-Path "venv")) {
+                        python -m venv venv
+                    }
+
+                    .\\venv\\Scripts\\python.exe -m pip install --upgrade pip
+                    .\\venv\\Scripts\\python.exe -m pip install dvc
                 '''
             }
         }
@@ -45,7 +56,8 @@ pipeline {
                     git config user.email "pinarkocagoz0336@gmail.com"
 
                     git add -A
-                    git commit -m "ci: auto dvc track" || echo "No changes to commit"
+                    git commit -m "ci: auto dvc track"
+                    if ($LASTEXITCODE -ne 0) { Write-Host "No changes to commit" }
 
                     git push origin main
                 '''
