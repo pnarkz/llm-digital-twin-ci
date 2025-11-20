@@ -1,0 +1,4 @@
+# configs/rag.yaml
+query: "Aziz Sancar kimdir?"
+collection_name: "embedded_articles"
+limit: 3

@@ -1,0 +1,30 @@
+# end_to_end_aziz_sancar.yaml
+author_links:
+  - user_full_name: "Aziz Sancar"
+    links:
+      - {"title": "Wikipedia", "url": "https://tr.wikipedia.org/wiki/Aziz_Sancar"}
+      - {"title": "Üsküdar Üniversitesi", "url": "https://uskudar.edu.tr/aziz-sancar"}
+      - {"title": "Haberler Biyografi", "url": "https://www.haberler.com/aziz-sancar/biyografisi/"}
+      - {"title": "EnglishCentral Biography", "url": "https://www.englishcentral.com/blog/ingilizce-ve-turkce-aziz-sancar-biyografi/"}
+      - {"title": "Nuve Haber", "url": "https://nuve.com.tr/NHaber/?p=703"}
+      - {"title": "Google Scholar", "url": "https://scholar.google.com/citations?view_op=list_works&hl=tr&user=mwGCWiIAAAAJ&sortby=pubdate"}
+      - {"title": "DHA Haberi", "url": "https://www.dha.com.tr/saglik-yasam/kolon-kanserine-iliskin-arastirma-prof-dr-aziz-sancardan-tebrik-aldi-2660627"}
+      - {"title": "AA Haberi", "url": "https://www.aa.com.tr/tr/gundem/aziz-sancar-turkiyenin-bana-gosterdigi-ilgi-10-nobelden-daha-onemli/2504424"}
+      - {"title": "AA Röportajı", "url": "https://www.aa.com.tr/tr/bilim-teknoloji/prof-dr-aziz-sancar-nobeli-aldigimda-butun-turk-dunyasini-temsil-ettigimi-biliyordum/1124257"}
+      - {"title": "Yetkin Report", "url": "https://yetkinreport.com/2023/06/12/aziz-sancar-bilim-adalet-ozgur-dusunce-sorgulamayla-yeserir/"}
+      - {"title": "HBT Röportajı", "url": "https://www.herkesebilimteknoloji.com/haberler/toplum/aziz-sancardan-genclere-tavsiyeler-konusmak-degil-calismak-lazim"}
+      - {"title": "Milliyet Yazısı", "url": "https://www.milliyet.com.tr/yazarlar/prof-dr-e-murat-tuzcu/aziz-sancar-in-ornek-yasami-2133656#:~:text=Y%C4%B1lmama%2C%20%C3%B6zg%C3%BCven%20ve%20en%20karanl%C4%B1k,%C3%B6rnek%20al%C4%B1nacak%20karakter%20%C3%B6zelliklerinden%20baz%C4%B1lar%C4%B1.&text=DNA'daki%20harflerden%20birinin%20veya,kopmas%C4%B1%20yaz%C4%B1l%C4%B1m%C4%B1n%20t%C3%BCm%20anlam%C4%B1n%C4%B1%20de%C4%9Fi%C5%9Ftirir."}
+      - {"title": "Sözcü Haberi", "url": "https://www.sozcu.com.tr/prof-dr-aziz-sancar-basarisinin-sirrini-acikladi-wp7802977"}
+      - {"title": "Iğdır Üniversitesi Blog", "url": "https://fef.igdir.edu.tr/blog/haberler-fef-igdir-edu-tr-143/aziz-sancar-kimdir-nobel-odulu-alan-turk-2483"}
+      - {"title": "Kapadokya Blog", "url": "https://blog.kapadokya.edu.tr/onculerevefa/aziz-sancar"}
+      - {"title": "Annual Review 1", "url": "https://www.annualreviews.org/content/journals/10.1146/annurev.biochem.73.011303.073723"}
+      - {"title": "Annual Review 2", "url": "https://www.annualreviews.org/content/journals/10.1146/annurev.bi.65.070196.000355"}
+      - {"title": "JBC Full Text", "url": "https://www.jbc.org/article/S0021-9258(25)02600-6/fulltext"}
+      - {"title": "Springer Article", "url": "https://link.springer.com/article/10.1007/s00204-025-03968-7"}
+      - {"title": "PLOS Genetics", "url": "https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1011365"}
+
+
+test_split_size: 0.1
+push_to_huggingface: false
+dataset_id: azizsancar/llmtwin
+mock: false

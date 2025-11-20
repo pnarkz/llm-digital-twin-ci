@@ -1,0 +1,14 @@
+settings:
+  docker:
+    parent_image: 992382797823.dkr.ecr.eu-central-1.amazonaws.com/zenml-rlwlcs:latest
+    skip_build: True
+  orchestrator.sagemaker:
+    synchronous: false
+
+parameters:
+  finetuning_type: sft           # supervised fine-tuning
+  num_train_epochs: 3            # eğitim epoch sayısı
+  per_device_train_batch_size: 2 # GPU/CPU başına batch boyutu
+  learning_rate: 3e-4
+  dataset_huggingface_workspace: azizsancar
+  is_dummy: false                # gerçek eğitim çalışsın (true -> sadece test)

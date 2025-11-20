@@ -1,0 +1,3 @@
+['remote "dags"']
+    url = https://dagshub.com/pnarkz/llm-digital-twin-ci.dvc
+    verify = false
