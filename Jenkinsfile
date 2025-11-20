@@ -7,6 +7,9 @@ pipeline {
 
     stages {
 
+        // ---------------------------
+        // CHECKOUT
+        // ---------------------------
         stage('Checkout') {
             steps {
                 checkout scm
@@ -14,7 +17,19 @@ pipeline {
         }
 
         // ---------------------------
-        // CREATE .env FROM CREDENTIAL
+        // FIX DETACHED HEAD (very important!)
+        // ---------------------------
+        stage('Fix Git Branch') {
+            steps {
+                bat '''
+                echo ==== Switching from detached HEAD to main branch ====
+                git checkout main
+                '''
+            }
+        }
+
+        // ---------------------------
+        // CREATE .env FROM CREDENTIALS
         // ---------------------------
         stage('Create .env') {
             steps {
@@ -57,7 +72,7 @@ pipeline {
         }
 
         // ---------------------------
-        // DOWNLOAD DATASET FROM HF
+        // DOWNLOAD DATASET
         // ---------------------------
         stage('Download Dataset from HuggingFace') {
             steps {
@@ -79,7 +94,7 @@ print('Dataset downloaded.')"
         }
 
         // ---------------------------
-        // DVC TRACK
+        // DVC ADD
         // ---------------------------
         stage('DVC Track Data') {
             steps {
@@ -112,8 +127,13 @@ print('Dataset downloaded.')"
         stage('Push Code to GitHub') {
             steps {
                 bat '''
+                echo ==== Making sure we are on main before pushing ====
+                git checkout main
+
                 git add .
                 git commit -m "ci: auto update" || echo "No changes"
+
+                echo ==== Pushing to GitHub main branch ====
                 git push origin main
                 '''
             }
