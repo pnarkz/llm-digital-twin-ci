@@ -7,143 +7,134 @@ pipeline {
 
     stages {
 
-        /* --------------------------------
-           CHECKOUT REPO
-        -------------------------------- */
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        /* --------------------------------
-           FIX DETACHED HEAD
-        -------------------------------- */
         stage('Fix Git Branch') {
             steps {
-                bat """
-                echo ==== Switching from detached HEAD to main ====
-                git fetch --all
+                bat '''
+                echo ==== Switching from detached HEAD to main branch ====
                 git checkout main
-                """
+                '''
             }
         }
 
-        /* --------------------------------
-           CREATE .env FILE FROM CREDENTIAL
-        -------------------------------- */
         stage('Create .env') {
             steps {
                 withCredentials([string(credentialsId: 'env-file-content', variable: 'ENV_CONTENT')]) {
                     writeFile file: '.env', text: ENV_CONTENT
-                    echo ".env created."
+                    echo ".env created from Jenkins credentials."
                 }
             }
         }
 
-        /* --------------------------------
-           PYTHON + DVC SETUP
-        -------------------------------- */
         stage('Setup Python & DVC') {
             steps {
-                bat """
+                bat '''
+                echo ==== Setting up Python Environment ====
                 python -m venv venv
                 call venv\\Scripts\\activate
                 pip install --upgrade pip
                 pip install dvc dagshub datasets python-dotenv
-                """
+                '''
             }
         }
 
-        /* --------------------------------
-           CONFIGURE DVC REMOTE (DAGSHUB)
-        -------------------------------- */
         stage('Configure DVC Remote') {
             steps {
                 withCredentials([string(credentialsId: 'dagshub-token', variable: 'DAG_TOKEN')]) {
-                    bat """
+                    bat '''
                     call venv\\Scripts\\activate
                     dvc remote modify dags --local auth basic
                     dvc remote modify dags --local user pnarkz
                     dvc remote modify dags --local password %DAG_TOKEN%
-                    """
+                    '''
                 }
             }
         }
 
-        /* --------------------------------
-           DOWNLOAD DATASET FROM HF
-        -------------------------------- */
+        // 🔥🔥🔥 BURASI ESKİ ÇALIŞAN VERSİYON
         stage('Download Dataset from HuggingFace') {
             steps {
-                bat """
+                bat '''
                 call venv\\Scripts\\activate
-                python download_data.py
-                """
+                python - << "EOF"
+from datasets import load_dataset
+import os, json, shutil
+from dotenv import load_dotenv
+
+load_dotenv(".env")
+token = os.getenv("HUGGINGFACE_ACCESS_TOKEN")
+
+print("Token loaded:", token[:10] + "...")
+
+# temizle
+if os.path.exists("data"):
+    shutil.rmtree("data")
+
+os.makedirs("data", exist_ok=True)
+
+# dataset
+ds = load_dataset("hsena/llmtwin", token=token)
+
+# kayıt
+for i, row in enumerate(ds["train"]):
+    with open(f"data/item_{i}.json", "w", encoding="utf-8") as f:
+        json.dump(row, f, ensure_ascii=False)
+
+print("Dataset downloaded.")
+EOF
+                '''
             }
         }
 
-        /* --------------------------------
-           DVC ADD
-        -------------------------------- */
         stage('DVC Track Data') {
             steps {
-                bat """
+                bat '''
                 call venv\\Scripts\\activate
                 dvc add data
                 git config user.name "pnarkz"
                 git config user.email "pinarkocagoz0336@gmail.com"
                 git add data.dvc .gitignore
-                git commit -m "ci: dvc track dataset" || echo No changes
-                """
+                git commit -m "ci: dvc track dataset" || echo "No changes"
+                '''
             }
         }
 
-        /* --------------------------------
-           DVC PUSH → DAGSHUB
-        -------------------------------- */
         stage('DVC Push Data') {
             steps {
-                bat """
+                bat '''
                 call venv\\Scripts\\activate
                 dvc push -r dags -v
-                """
+                '''
             }
         }
 
-        /* --------------------------------
-           FIX GIT DIVERGE + AUTH PUSH TO GITHUB
-        -------------------------------- */
         stage('Push Code to GitHub') {
             steps {
-                withCredentials([usernamePassword(
-                        credentialsId: 'github-creds',
-                        usernameVariable: 'GIT_USER',
-                        passwordVariable: 'GIT_PASS'
-                )]) {
-                    bat """
-                    echo ==== Resetting local branch to match GitHub ====
-                    git fetch origin
-                    git reset --hard origin/main
+                bat '''
+                echo ==== Making sure we are on main before pushing ====
+                git checkout main
 
-                    echo ==== Commit local CI changes ====
-                    git add .
-                    git commit -m "ci: auto update" || echo No changes
+                git add .
+                git commit -m "ci: auto update" || echo "No changes"
 
-                    echo ==== Pushing safely with credentials ====
-                    git push https://%GIT_USER%:%GIT_PASS%@github.com/pnarkz/llm-digital-twin-ci.git main --force-with-lease
-                    """
-                }
+                echo ==== Pushing to GitHub main branch ====
+                git push origin main
+                '''
             }
         }
     }
 
     post {
         success {
-            echo "✔ Pipeline SUCCESS"
+            echo '✔ Pipeline SUCCESS'
         }
         failure {
-            echo "❌ Pipeline FAILED — check logs"
+            echo '❌ Pipeline FAILED — check logs'
         }
     }
 }
