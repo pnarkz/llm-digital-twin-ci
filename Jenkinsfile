@@ -7,12 +7,18 @@ pipeline {
 
     stages {
 
+        // ---------------------------
+        // CHECKOUT
+        // ---------------------------
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        // ---------------------------
+        // FIX DETACHED HEAD (very important!)
+        // ---------------------------
         stage('Fix Git Branch') {
             steps {
                 bat '''
@@ -22,6 +28,9 @@ pipeline {
             }
         }
 
+        // ---------------------------
+        // CREATE .env FROM CREDENTIALS
+        // ---------------------------
         stage('Create .env') {
             steps {
                 withCredentials([string(credentialsId: 'env-file-content', variable: 'ENV_CONTENT')]) {
@@ -31,9 +40,13 @@ pipeline {
             }
         }
 
+        // ---------------------------
+        // SETUP PYTHON & DVC
+        // ---------------------------
         stage('Setup Python & DVC') {
             steps {
                 bat '''
+                echo ==== Setting up Python Environment ====
                 python -m venv venv
                 call venv\\Scripts\\activate
                 pip install --upgrade pip
@@ -42,6 +55,9 @@ pipeline {
             }
         }
 
+        // ---------------------------
+        // CONFIGURE DVC REMOTE
+        // ---------------------------
         stage('Configure DVC Remote') {
             steps {
                 withCredentials([string(credentialsId: 'dagshub-token', variable: 'DAG_TOKEN')]) {
@@ -55,39 +71,31 @@ pipeline {
             }
         }
 
-        // 🔥 %100 ÇALIŞAN ESKİ METOT — python <<EOF
+        // ---------------------------
+        // DOWNLOAD DATASET
+        // ---------------------------
         stage('Download Dataset from HuggingFace') {
             steps {
                 bat '''
                 call venv\\Scripts\\activate
-                python - << "EOF"
-from datasets import load_dataset
-import os, json, shutil
-from dotenv import load_dotenv
-
-load_dotenv(".env")
-token = os.getenv("HUGGINGFACE_ACCESS_TOKEN")
-print("Token loaded:", token[:10] + "...")
-
-# temiz klasör
-if os.path.exists("data"):
-    shutil.rmtree("data")
-os.makedirs("data", exist_ok=True)
-
-# dataset indir
-ds = load_dataset("hsena/llmtwin", token=token)
-
-# json kaydet
-for i, row in enumerate(ds["train"]):
-    with open(f"data/item_{i}.json","w",encoding="utf-8") as f:
-        json.dump(row, f, ensure_ascii=False)
-
-print("Dataset downloaded successfully.")
-EOF
+                python -c "import os, shutil; \
+from datasets import load_dataset; \
+from dotenv import load_dotenv; \
+load_dotenv('.env'); \
+token=os.getenv('HUGGINGFACE_ACCESS_TOKEN'); \
+print('Token loaded:', token[:10]+'...'); \
+ds=load_dataset('hsena/llmtwin', token=token); \
+shutil.rmtree('data', ignore_errors=True); \
+os.makedirs('data', exist_ok=True); \
+[open(f'data/item_{i}.json','w',encoding='utf8').write(str(x)) for i,x in enumerate(ds['train'])]; \
+print('Dataset downloaded.')"                
                 '''
             }
         }
 
+        // ---------------------------
+        // DVC ADD
+        // ---------------------------
         stage('DVC Track Data') {
             steps {
                 bat '''
@@ -101,6 +109,9 @@ EOF
             }
         }
 
+        // ---------------------------
+        // PUSH DATA TO DAGSHUB
+        // ---------------------------
         stage('DVC Push Data') {
             steps {
                 bat '''
@@ -110,12 +121,19 @@ EOF
             }
         }
 
+        // ---------------------------
+        // PUSH CODE TO GITHUB
+        // ---------------------------
         stage('Push Code to GitHub') {
             steps {
                 bat '''
+                echo ==== Making sure we are on main before pushing ====
                 git checkout main
+
                 git add .
                 git commit -m "ci: auto update" || echo "No changes"
+
+                echo ==== Pushing to GitHub main branch ====
                 git push origin main
                 '''
             }
@@ -123,7 +141,11 @@ EOF
     }
 
     post {
-        success { echo '✔ Pipeline SUCCESS' }
-        failure { echo '❌ Pipeline FAILED — check logs' }
+        success {
+            echo '✔ Pipeline SUCCESS'
+        }
+        failure {
+            echo '❌ Pipeline FAILED — check logs'
+        }
     }
 }
