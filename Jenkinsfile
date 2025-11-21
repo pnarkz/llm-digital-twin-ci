@@ -1,14 +1,25 @@
 pipeline {
     agent any
 
+    environment {
+        DAG_REMOTE = "dags"
+        VENV = "venv\\Scripts"
+    }
+
     stages {
 
+        /* --------------------------------------------------------
+         * 1. CHECKOUT
+         * --------------------------------------------------------*/
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        /* --------------------------------------------------------
+         * 2. Fix Branch (Detached HEAD sorununu çözer)
+         * --------------------------------------------------------*/
         stage('Fix Branch') {
             steps {
                 bat '''
@@ -17,6 +28,9 @@ pipeline {
             }
         }
 
+        /* --------------------------------------------------------
+         * 3. Create .env from Jenkins Credentials
+         * --------------------------------------------------------*/
         stage('Create .env') {
             steps {
                 withCredentials([string(credentialsId: 'env-file-content', variable: 'ENV_CONTENT')]) {
@@ -25,22 +39,43 @@ pipeline {
             }
         }
 
+        /* --------------------------------------------------------
+         * 4. Python + DVC + MLflow + Security Dependencies
+         * --------------------------------------------------------*/
         stage('Setup Python') {
             steps {
                 bat '''
                 python -m venv venv
-                call venv\\Scripts\\activate
+                call %VENV%\\activate
+
                 pip install --upgrade pip
-                pip install dvc dagshub datasets python-dotenv
+                pip install dvc[dagshub] datasets python-dotenv mlflow pip-audit
                 '''
             }
         }
 
+        /* --------------------------------------------------------
+         * 5. Security Scan (OWASP ML06 + LLM05)
+         * --------------------------------------------------------*/
+        stage('Security Scan') {
+            steps {
+                bat '''
+                call %VENV%\\activate
+                python security/security_scan.py
+                python security/data_security_checks.py
+                '''
+            }
+        }
+
+        /* --------------------------------------------------------
+         * 6. Configure DVC Remote (DagsHub)
+         * --------------------------------------------------------*/
         stage('Configure DVC Remote') {
             steps {
                 withCredentials([string(credentialsId: 'dagshub-token', variable: 'DAG_TOKEN')]) {
                     bat '''
-                    call venv\\Scripts\\activate
+                    call %VENV%\\activate
+
                     dvc remote modify dags --local auth basic
                     dvc remote modify dags --local user pnarkz
                     dvc remote modify dags --local password %DAG_TOKEN%
@@ -49,65 +84,76 @@ pipeline {
             }
         }
 
+        /* --------------------------------------------------------
+         * 7. Download Dataset (HuggingFace → /data)
+         * --------------------------------------------------------*/
         stage('Download Dataset') {
             steps {
                 bat '''
-                echo from datasets import load_dataset > download_data.py
-                echo import os, json, shutil >> download_data.py
-                echo from dotenv import load_dotenv >> download_data.py
-                echo load_dotenv(".env") >> download_data.py
-                echo token=os.getenv("HUGGINGFACE_ACCESS_TOKEN") >> download_data.py
-                echo print("Token:", token[:10]+"...") >> download_data.py
-                echo ds=load_dataset("hsena/llmtwin", token=token) >> download_data.py
-                echo shutil.rmtree("data", ignore_errors=True) >> download_data.py
-                echo os.makedirs("data", exist_ok=True) >> download_data.py
-                echo import json >> download_data.py
-                echo [open(f"data/item_{i}.json","w",encoding="utf8").write(json.dumps(row,ensure_ascii=False)) for i,row in enumerate(ds["train"])] >> download_data.py
-
-                call venv\\Scripts\\activate
-                python download_data.py
+                call %VENV%\\activate
+                python tools/download_data.py
                 '''
             }
         }
 
+        /* --------------------------------------------------------
+         * 8. Track Data with DVC (CRITICAL fix: no untracked file error)
+         * --------------------------------------------------------*/
         stage('DVC Track') {
             steps {
                 bat '''
-                call venv\\Scripts\\activate
+                call %VENV%\\activate
+
+                REM Fix Git identity
+                git config user.name "pnarkz"
+                git config user.email "pinarkocagoz0336@gmail.com"
+
                 dvc add data
-                git add data.dvc .gitignore
-                git commit -m "ci: track data" || echo "No changes"
+
+                git add data.dvc data/.gitignore
+                git commit -m "ci: track dataset" || echo "No changes"
                 '''
             }
         }
 
+        /* --------------------------------------------------------
+         * 9. Push Data to DagsHub
+         * --------------------------------------------------------*/
         stage('DVC Push') {
             steps {
                 bat '''
-                call venv\\Scripts\\activate
-                dvc push -r dags -v
+                call %VENV%\\activate
+                dvc push -r dags
                 '''
             }
         }
 
+        /* --------------------------------------------------------
+         * 10. Push Code to GitHub (only staged changes)
+         * --------------------------------------------------------*/
         stage('Push Code') {
             steps {
                 bat '''
                 git checkout main
 
-                REM === ÇÖZÜM: Rebase ile çakışmayı gider ===
-                git pull --rebase origin main
-
-                git add .
+                git add -A
                 git commit -m "ci: auto update" || echo "No changes"
+
                 git push origin main
                 '''
             }
         }
     }
 
+    /* --------------------------------------------------------
+     * POST
+     * --------------------------------------------------------*/
     post {
-        success { echo '✔ SUCCESS' }
-        failure { echo '❌ FAILED' }
+        success {
+            echo "✔ Pipeline SUCCESS"
+        }
+        failure {
+            echo "❌ Pipeline FAILED — check logs"
+        }
     }
 }
